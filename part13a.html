@@ -12,23 +12,17 @@
 
 </head>
 <body>
+<button id='button' class='btn' style='height:20px; width:100px;'>Record audio</button>
 
 <script>
-
 var ctx = createCanvas("canvas1");
 ctx.background(235);
 
 function draw(){
-
   var s = Mic.getVolume();
-  //console.log(s);
-  // ctx.fillStyle = hsl(s, 30, 50);
   ctx.fillStyle = rgb(s*2);
   ctx.HfillEllipse(w/2, h/2, s*5, s*5);
 }
-
-
-
 </script>
 
 </body>

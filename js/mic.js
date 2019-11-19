@@ -20,7 +20,10 @@ function Microphone (_fft) {
 
     function init () {
       try {
-        startMic(new AudioContext());
+        document.getElementById('button')
+          .addEventListener('click', function () {
+            startMic(new AudioContext());
+        });
       }
       catch (e) {
         console.error(e);
@@ -47,7 +50,7 @@ function Microphone (_fft) {
           // getByteFrequencyData returns the amplitude for each frequency
           analyser.getByteFrequencyData(self.spectrum);
           self.data = adjustFreqData(self.spectrum);
-          
+
           // getByteTimeDomainData gets volumes over the sample time
           //analyser.getByteTimeDomainData(dataArray);
           self.vol = self.getRMS(self.spectrum);
