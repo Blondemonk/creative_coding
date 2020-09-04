@@ -11,19 +11,34 @@
 </head>
 <body style="margin:0px;">
     <button id='button' class='btn' style='height:20px; width:100px;'>Record audio</button>
+    <button id='stopaudio' class='btn' style='height:20px; width:100px;'>Stop recording</button>
+    <div id="Note"></div>
 
     <script>
     var ctx = createCanvas("canvas1");
 
     // make a grid 200 wide
-    var grid = new Grid(300, 1);
+    var bins = 256;
+    var grid = new Grid(bins, 1);
 
     function draw(){
+      // White background
       ctx.background(255);
+
       for (var i = 0; i < grid.length; i++) {
+
         var s = Mic.spectrum[i];
-        ctx.fillStyle = hsl(map(i, 0, grid.length, 0, 360), 80, 50);
-        ctx.fillRect(grid.x[i], h - s, grid.spacing_x-1, s);
+
+        // Choose a colour based on the columns index
+        ctx.fillStyle = hsl(map(i, 0, grid.length, 0, 300), 80, 50);
+
+        // Fill the relevant part of the spectrum
+        // grid.spacing_x is the column width
+        // Height: 0 is top of the screen, so this keeps the spectrum at the bottomss
+        ctx.fillRect(grid.x[i], window.innerHeight - s, grid.spacing_x-1, s);
+
+        // document.getElementById('Note').innerText = "Note: "+Mic.matchNote();
+        console.log(Mic.data);
       }
     }
     </script>

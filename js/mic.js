@@ -1,151 +1,127 @@
-
-
 function Microphone (_fft) {
+  var FFT_SIZE = _fft || 2048;
 
-    var FFT_SIZE = _fft || 2048;
+  this.spectrum = new Uint8Array(FFT_SIZE/2);
+  this.data = [];
+  this.volume = this.vol = 0;
+  this.peak_volume = 0;
 
-    this.spectrum = new Uint8Array(FFT_SIZE/2);
-    this.data = [];
-    this.volume = this.vol = 0;
-    this.peak_volume = 0;
+  var self = this;
+  var audioContext = new AudioContext();
 
-    var self = this;
-    var audioContext = new AudioContext();
+  var SAMPLE_RATE = audioContext.sampleRate;
+  window.AudioContext = window.AudioContext || window.webkitAudioContext;
+  navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia;
 
-    var SAMPLE_RATE = audioContext.sampleRate;
-    window.AudioContext = window.AudioContext || window.webkitAudioContext;
-    navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia;
+  window.addEventListener('load', init, false);
 
-    window.addEventListener('load', init, false);
+  function init () {
+    try {
+      document.getElementById('button')
+        .addEventListener('click', function () {
+          startMic(new AudioContext());
+      });
 
-    function init () {
-      try {
-        document.getElementById('button')
-          .addEventListener('click', function () {
-            startMic(new AudioContext());
-        });
-      }
-      catch (e) {
-        console.error(e);
-        alert('Web Audio API is not supported in this browser');
-      }
+      document.getElementById('stopaudio')
+        .addEventListener('click', function () {
+          startMic(new AudioContext());
+      });
     }
+    catch (e) {
+      console.error(e);
+      alert('Web Audio API is not supported in this browser');
+    }
+  }
 
+  function startMic (context) {
+    navigator.getUserMedia({ audio: true }, processSound, error);
 
-    function startMic (context) {
+    function processSound (stream) {
+      // analyser extracts frequency, waveform, and other data
+      var analyser = context.createAnalyser();
+      analyser.smoothingTimeConstant = 0.2;
+      analyser.fftSize = FFT_SIZE;
 
-      navigator.getUserMedia({ audio: true }, processSound, error);
+      var node = context.createScriptProcessor(FFT_SIZE*2, 1, 1);
 
-      function processSound (stream) {
+      node.onaudioprocess = function () {
 
-        // analyser extracts frequency, waveform, and other data
-        var analyser = context.createAnalyser();
-        analyser.smoothingTimeConstant = 0.2;
-        analyser.fftSize = FFT_SIZE;
+        // getByteFrequencyData returns the amplitude for each frequency
+        analyser.getByteFrequencyData(self.spectrum);
+        self.data = adjustFreqData(self.spectrum);
 
-        var node = context.createScriptProcessor(FFT_SIZE*2, 1, 1);
+        // getByteTimeDomainData gets volumes over the sample time
+        //analyser.getByteTimeDomainData(dataArray);
+        self.vol = self.getRMS(self.spectrum);
+        // get peak
+        if (self.vol > self.peak_volume) self.peak_volume = self.vol;
+        self.volume = self.vol;
+      };
 
-        node.onaudioprocess = function () {
+      var input = context.createMediaStreamSource(stream);
 
-          // getByteFrequencyData returns the amplitude for each frequency
-          analyser.getByteFrequencyData(self.spectrum);
-          self.data = adjustFreqData(self.spectrum);
-
-          // getByteTimeDomainData gets volumes over the sample time
-          //analyser.getByteTimeDomainData(dataArray);
-          self.vol = self.getRMS(self.spectrum);
-          // get peak
-          if (self.vol > self.peak_volume) self.peak_volume = self.vol;
-          self.volume = self.vol;
-        };
-
-        var input = context.createMediaStreamSource(stream);
-
-        input.connect(analyser);
-        analyser.connect(node);
-        node.connect(context.destination);
-
-      }
-
-      function error () {
-        console.log(arguments);
-      }
+      input.connect(analyser);
+      analyser.connect(node);
+      node.connect(context.destination);
 
     }
 
-    ///////////////////////////////////////////////
-    ////////////// SOUND UTILITIES  //////////////
-    /////////////////////////////////////////////
-    this.mapSound = function(_me, _total, _min, _max){
-
-      if (self.spectrum.length > 0) {
-
-        var min = _min || 0;
-        var max = _max || 100;
-        //actual new freq
-        var new_freq = Math.floor(_me /_total * self.data.length);
-        //console.log(self.spectrum[new_freq]);
-        // map the volumes to a useful number
-        return map(self.data[new_freq], 0, self.peak_volume, min, max);
-      } else {
-        return 0;
-      }
-
+    function error () {
+      console.log(arguments);
     }
+  }
 
-    this.mapRawSound = function(_me, _total, _min, _max){
+  ///////////////////////////////////////////////
+  ////////////// SOUND UTILITIES  //////////////
+  /////////////////////////////////////////////
+  this.mapSound = function(_me, _total, _min, _max){
+    if (self.spectrum.length > 0) {
 
-      if (self.spectrum.length > 0) {
-
-        var min = _min || 0;
-        var max = _max || 100;
-        //actual new freq
-        var new_freq = Math.floor(_me /_total * (self.spectrum.length)/2);
-        //console.log(self.spectrum[new_freq]);
-        // map the volumes to a useful number
-        return map(self.spectrum[new_freq], 0, self.peak_volume, min, max);
-      } else {
-        return 0;
-      }
-
+      var min = _min || 0;
+      var max = _max || 100;
+      //actual new freq
+      var new_freq = Math.floor(_me /_total * self.data.length);
+      //console.log(self.spectrum[new_freq]);
+      // map the volumes to a useful number
+      return map(self.data[new_freq], 0, self.peak_volume, min, max);
+    } else {
+      return 0;
     }
+  }
 
+  this.mapRawSound = function(_me, _total, _min, _max){
+    if (self.spectrum.length > 0) {
 
-    this.getVol = function(){
-
-      // map total volume to 100 for convenience
-      self.volume = map(self.vol, 0, self.peak_volume, 0, 100);
-      return self.volume;
+      var min = _min || 0;
+      var max = _max || 100;
+      //actual new freq
+      var new_freq = Math.floor(_me /_total * (self.spectrum.length)/2);
+      //console.log(self.spectrum[new_freq]);
+      // map the volumes to a useful number
+      return map(self.spectrum[new_freq], 0, self.peak_volume, min, max);
+    } else {
+      return 0;
     }
+  }
 
-    this.getVolume = function() { return this.getVol();}
+  this.getVol = function(){
+    // map total volume to 100 for convenience
+    self.volume = map(self.vol, 0, self.peak_volume, 0, 100);
+    return self.volume;
+  }
 
-    //A more accurate way to get overall volume
-    this.getRMS = function (spectrum) {
+  this.getVolume = function() { return this.getVol();}
 
-          var rms = 0;
-          for (var i = 0; i < spectrum.length; i++) {
-            rms += spectrum[i] * spectrum[i];
-          }
-          rms /= spectrum.length;
-          rms = Math.sqrt(rms);
-          return rms;
+  //A more accurate way to get overall volume
+  this.getRMS = function (spectrum) {
+    var rms = 0;
+    for (var i = 0; i < spectrum.length; i++) {
+      rms += spectrum[i] * spectrum[i];
     }
-
-//freq = n * SAMPLE_RATE / MY_FFT_SIZE
-function mapFreq(i){
-  var freq = i * SAMPLE_RATE / FFT_SIZE;
-  return freq;
-}
-
-// getMix function. Computes the current frequency with
-// computeFreqFromFFT, then returns bass, mids and his
-// sub bass : 0 > 100hz
-// mid bass : 80 > 500hz
-// mid range: 400 > 2000hz
-// upper mid: 1000 > 6000hz
-// high freq: 4000 > 12000hz
-// Very high freq: 10000 > 20000hz and above
+    rms /= spectrum.length;
+    rms = Math.sqrt(rms);
+    return rms;
+  }
 
   this.getMix = function(){
     var highs = [];
@@ -168,17 +144,16 @@ function mapFreq(i){
     return {bass: bass, mids: mids, highs: highs}
   }
 
-
   this.getBass = function(){
-          return this.getMix().bass;
-    }
+    return this.getMix().bass;
+  }
 
   this.getMids = function(){
-        return this.getMix().mids;
+    return this.getMix().mids;
   }
 
   this.getHighs = function(){
-        return this.getMix().highs;
+    return this.getMix().highs;
   }
 
   this.getHighsVol = function(_min, _max){
@@ -202,9 +177,40 @@ function mapFreq(i){
     return v;
   }
 
+  this.matchNote = function (freq) {
+    var closest = "A#1"; // Default closest note
+    var closestFreq = 58.2705;
+    for (var key in notes) { // Iterates through note look-up table
+        // If the current note in the table is closer to the given
+        // frequency than the current "closest" note, replace the
+        // "closest" note.
+        if (Math.abs(notes[key] - freq) <= Math.abs(notes[closest] -
+                freq)) {
+            closest = key;
+            closestFreq = notes[key];
+        }
+        // Stop searching once the current note in the table is of higher
+        // frequency than the given frequency.
+        if (notes[key] > freq) {
+            break;
+        }
+    }
 
-  function adjustFreqData(frequencyData, ammt) {
-    // get frequency data, remove obsolete
+    return [closest, closestFreq];
+  }
+
+  return this;
+};
+
+
+//freq = n * SAMPLE_RATE / MY_FFT_SIZE
+function mapFreq(i){
+  var freq = i * SAMPLE_RATE / FFT_SIZE;
+  return freq;
+}
+
+function adjustFreqData(frequencyData, ammt) {
+  // get frequency data, remove obsolete
   //analyserNode.getByteFrequencyData(frequencyData);
 
   frequencyData.slice(0,frequencyData.length/2);
@@ -240,35 +246,6 @@ function mapFreq(i){
   }
   return newFreqs;
 }
-
-
-  this.matchNote = function (freq) {
-    var closest = "A#1"; // Default closest note
-    var closestFreq = 58.2705;
-    for (var key in notes) { // Iterates through note look-up table
-        // If the current note in the table is closer to the given
-        // frequency than the current "closest" note, replace the
-        // "closest" note.
-        if (Math.abs(notes[key] - freq) <= Math.abs(notes[closest] -
-                freq)) {
-            closest = key;
-            closestFreq = notes[key];
-        }
-        // Stop searching once the current note in the table is of higher
-        // frequency than the given frequency.
-        if (notes[key] > freq) {
-            break;
-        }
-    }
-
-    return [closest, closestFreq];
-}
-
-
-  return this;
-
-  };
-
 
 
 var Mic = new Microphone();

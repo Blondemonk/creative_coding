@@ -1100,7 +1100,7 @@ function cjsloop() {
   var now = Date.now();
   var elapsedMils = now - lastUpdate;
 
-  if((typeof window.draw == 'function') && (elapsedMils>=(1000/window.frameRate))) {
+  if((typeof window.draw == 'function') && (elapsedMils>=(1000/*/window.frameRate*/))) {
     window.draw();
     frameCount++;
     frameNumber++;
